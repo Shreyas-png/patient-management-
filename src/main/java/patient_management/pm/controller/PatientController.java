@@ -30,4 +30,16 @@ public class PatientController {
         PatientResponseDTO savedPatient = patientService.savePatient(newPatient);
         return new ResponseEntity<>(savedPatient, HttpStatus.CREATED);
     }
+
+    @PutMapping("/email/{email}")
+    public ResponseEntity<PatientResponseDTO> updatePatient(@RequestBody PatientRequestDTO updatedPatient, @PathVariable String email){
+        PatientResponseDTO newPatient = patientService.updatePatient(email, updatedPatient);
+        return new ResponseEntity<>(newPatient, HttpStatus.OK);
+    }
+
+    @DeleteMapping("/email/{email}")
+    public ResponseEntity<PatientResponseDTO> deletePatient(@PathVariable String email){
+        patientService.deletePatient(email);
+        return new ResponseEntity<>(HttpStatus.NO_CONTENT);
+    }
 }
