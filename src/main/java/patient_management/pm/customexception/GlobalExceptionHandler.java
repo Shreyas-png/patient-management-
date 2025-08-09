@@ -11,8 +11,8 @@ import java.time.LocalDateTime;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(ResourceAlreadyExist.class)
-    public ResponseEntity<ApiError> resourceAlreadyExistHandler(String message){
-        ApiError error = new ApiError(400, message, "Duplicate Entry", LocalDateTime.now());
+    public ResponseEntity<ApiError> resourceAlreadyExistHandler(ResourceAlreadyExist ex){
+        ApiError error = new ApiError(400, ex.getMessage(), "Duplicate Entry", LocalDateTime.now());
         return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
     }
 }
