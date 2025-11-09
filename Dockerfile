@@ -9,7 +9,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 
-FROM openjdk:26-jdk AS runner
+FROM eclipse-temurin:17-jdk AS runner
 
 WORKDIR /app
 

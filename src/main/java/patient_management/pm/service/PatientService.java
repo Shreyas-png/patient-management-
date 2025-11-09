@@ -7,6 +7,9 @@ import patient_management.pm.customexception.ResourceDoesNotExist;
 import patient_management.pm.dto.PatientRequestDTO;
 import patient_management.pm.dto.PatientResponseDTO;
 import patient_management.pm.entity.Patient;
+import patient_management.pm.grpc.BillingServiceGrpcClient;
+import patient_management.pm.proto.BillingRequest;
+import patient_management.pm.proto.BillingResponse;
 import patient_management.pm.repository.PatientRepository;
 
 import java.time.LocalDate;
@@ -16,9 +19,11 @@ import java.util.List;
 @Service
 public class PatientService {
     private final PatientRepository patientRepository;
+    private final BillingServiceGrpcClient billingServiceGrpcClient;
 
-    public PatientService(PatientRepository patientRepository) {
+    public PatientService(PatientRepository patientRepository, BillingServiceGrpcClient billingServiceGrpcClient) {
         this.patientRepository = patientRepository;
+        this.billingServiceGrpcClient = billingServiceGrpcClient;
     }
 
     public List<PatientResponseDTO> getAllPatients() {
@@ -31,16 +36,45 @@ public class PatientService {
         return allPatients;
     }
 
+    @Transactional
     public PatientResponseDTO savePatient(PatientRequestDTO newPatient) {
-//        Optional<Patient> oldPatient = patientRepository.findByEmail(newPatient.getEmail());
-//        if(oldPatient.isPresent()) throw new ResourceAlreadyExist("Patient with email " + newPatient.getEmail() + " exist");
+
+        //Checking for duplicate entry
         if (patientRepository.existsByEmail(newPatient.getEmail()))
             throw new ResourceAlreadyExist("Patient with email " + newPatient.getEmail() + " exist");
-        Patient patient = new Patient(newPatient.getName(), newPatient.getEmail(), newPatient.getAddress(), newPatient.getDateOfBirth(), LocalDate.now());
+
+        //Building an entity
+        Patient patient = Patient.builder()
+                .name(newPatient.getName())
+                .address(newPatient.getAddress())
+                .email(newPatient.getEmail())
+                .registeredDate(LocalDate.now())
+                .dateOfBirth(newPatient.getDateOfBirth())
+                .build();
+
+        //Adding the patient to patient db
         Patient savedPatient = patientRepository.save(patient);
-        return new PatientResponseDTO(savedPatient.getName(), savedPatient.getEmail(), savedPatient.getAddress(), savedPatient.getDateOfBirth());
+
+        //Building GRPC Request for billing account
+        BillingRequest billingRequest = BillingRequest.newBuilder()
+                .setEmail(savedPatient.getEmail())
+                .setPatientId(savedPatient.getId().toString())
+                .setName(savedPatient.getName())
+                .build();
+
+        //Calling GRPC Client method to add patient to billing service
+        BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(billingRequest);
+
+        //Building patient response DTO and returning the same
+        return  PatientResponseDTO.builder()
+                .name(savedPatient.getName())
+                .address(savedPatient.getAddress())
+                .dateOfBirth(savedPatient.getDateOfBirth())
+                .email(savedPatient.getEmail())
+                .build();
     }
 
+    @Transactional
     public PatientResponseDTO updatePatient(String email, PatientRequestDTO newPatient) {
         if (!patientRepository.existsByEmail(email))
             throw new ResourceDoesNotExist("Patient with email " + email + " does not exist");
