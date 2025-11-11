@@ -138,7 +138,7 @@ public class PatientService {
         BillingRequest billingRequest = BillingRequest.newBuilder()
                 .setEmail(oldPatient.getEmail())
                 .setPatientId(oldPatient.getId().toString())
-                .setStatus("ACTIVE")
+                .setStatus("INACTIVE")
                 .build();
 
         //Calling GRPC Client method to add patient to billing service
