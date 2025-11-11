@@ -1,5 +1,6 @@
 package patient_management.pm.service;
 
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import patient_management.pm.customexception.ResourceAlreadyExist;
@@ -16,6 +17,7 @@ import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
+@Slf4j
 @Service
 public class PatientService {
     private final PatientRepository patientRepository;
@@ -64,6 +66,7 @@ public class PatientService {
 
         //Calling GRPC Client method to add patient to billing service
         BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(billingRequest);
+        log.info(billingResponse.getPatientId() + " " + billingResponse.getEmail());
 
         //Building patient response DTO and returning the same
         return  PatientResponseDTO.builder()
@@ -76,22 +79,70 @@ public class PatientService {
 
     @Transactional
     public PatientResponseDTO updatePatient(String email, PatientRequestDTO newPatient) {
+
+        //Checking if patient exists
         if (!patientRepository.existsByEmail(email))
             throw new ResourceDoesNotExist("Patient with email " + email + " does not exist");
         Patient oldPatient = patientRepository.findByEmail(email);
-        if (newPatient.getName() != null && !newPatient.getName().isBlank()) oldPatient.setName(newPatient.getName());
+
+        //Updating patient's name
+        if (newPatient.getName() != null && !newPatient.getName().isBlank())
+            oldPatient.setName(newPatient.getName());
+
+        //Updating patient's email
         if (newPatient.getEmail() != null && !newPatient.getEmail().isBlank())
             oldPatient.setEmail(newPatient.getEmail());
+
+        //Updating patient's address
         if (newPatient.getAddress() != null && !newPatient.getAddress().isBlank())
             oldPatient.setAddress(newPatient.getAddress());
+
+        //Updating patient's DOB
         if (newPatient.getDateOfBirth() != null) oldPatient.setDateOfBirth(newPatient.getDateOfBirth());
         oldPatient = patientRepository.save(oldPatient);
-        return new PatientResponseDTO(oldPatient.getName(), oldPatient.getEmail(), oldPatient.getAddress(), oldPatient.getDateOfBirth());
+
+        //Building GRPC Request for billing account
+        BillingRequest billingRequest = BillingRequest.newBuilder()
+                .setEmail(oldPatient.getEmail())
+                .setPatientId(oldPatient.getId().toString())
+                .setStatus("ACTIVE")
+                .build();
+
+        //Calling GRPC Client method to add patient to billing service
+        BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(billingRequest);
+        log.info(billingResponse.getPatientId() + " " + billingResponse.getEmail());
+
+        //Building patient response dto and returning the same
+        return PatientResponseDTO.builder()
+                .name(oldPatient.getName())
+                .email(oldPatient.getEmail())
+                .address(oldPatient.getAddress())
+                .dateOfBirth(oldPatient.getDateOfBirth())
+                .build();
     }
 
     @Transactional
     public void deletePatient(String email){
-        if(!patientRepository.existsByEmail(email)) throw new ResourceDoesNotExist("Patient with email " + email + " does not exist");
+
+        //checking if patient exists
+        if(!patientRepository.existsByEmail(email))
+            throw new ResourceDoesNotExist("Patient with email " + email + " does not exist");
+
+        //getting patient details to make rpc call
+        Patient oldPatient = patientRepository.findByEmail(email);
+
+        //deleting the patient
         patientRepository.deleteByEmail(email);
+
+        //Building GRPC Request for billing account
+        BillingRequest billingRequest = BillingRequest.newBuilder()
+                .setEmail(oldPatient.getEmail())
+                .setPatientId(oldPatient.getId().toString())
+                .setStatus("ACTIVE")
+                .build();
+
+        //Calling GRPC Client method to add patient to billing service
+        BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(billingRequest);
+        log.info(billingResponse.getPatientId() + " " + billingResponse.getEmail());
     }
 }
