@@ -9,8 +9,9 @@ import patient_management.pm.dto.PatientRequestDTO;
 import patient_management.pm.dto.PatientResponseDTO;
 import patient_management.pm.entity.Patient;
 import patient_management.pm.grpc.BillingServiceGrpcClient;
-import patient_management.pm.proto.BillingRequest;
+import patient_management.pm.kafka.KafkaProducer;
 import patient_management.pm.proto.BillingResponse;
+import patient_management.pm.proto.PatientEvent;
 import patient_management.pm.repository.PatientRepository;
 
 import java.time.LocalDate;
@@ -22,12 +23,15 @@ import java.util.List;
 public class PatientService {
     private final PatientRepository patientRepository;
     private final BillingServiceGrpcClient billingServiceGrpcClient;
+    private final KafkaProducer kafkaProducer;
 
-    public PatientService(PatientRepository patientRepository, BillingServiceGrpcClient billingServiceGrpcClient) {
+    public PatientService(PatientRepository patientRepository, BillingServiceGrpcClient billingServiceGrpcClient, KafkaProducer kafkaProducer) {
         this.patientRepository = patientRepository;
         this.billingServiceGrpcClient = billingServiceGrpcClient;
+        this.kafkaProducer = kafkaProducer;
     }
 
+    //API to get all patients
     public List<PatientResponseDTO> getAllPatients() {
         List<Patient> patients = patientRepository.findAll();
         List<PatientResponseDTO> allPatients = new ArrayList<>();
@@ -38,6 +42,7 @@ public class PatientService {
         return allPatients;
     }
 
+    //API to save patient to db
     @Transactional
     public PatientResponseDTO savePatient(PatientRequestDTO newPatient) {
 
@@ -57,16 +62,12 @@ public class PatientService {
         //Adding the patient to patient db
         Patient savedPatient = patientRepository.save(patient);
 
-        //Building GRPC Request for billing account
-        BillingRequest billingRequest = BillingRequest.newBuilder()
-                .setEmail(savedPatient.getEmail())
-                .setPatientId(savedPatient.getId().toString())
-                .setStatus("ACTIVE")
-                .build();
-
         //Calling GRPC Client method to add patient to billing service
-        BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(billingRequest);
+        BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(savedPatient, "ACTIVE");
         log.info(billingResponse.getPatientId() + " " + billingResponse.getEmail());
+
+        //calling kafka method to push a patient event
+        kafkaProducer.pushPatientEvent(savedPatient);
 
         //Building patient response DTO and returning the same
         return  PatientResponseDTO.builder()
@@ -83,6 +84,9 @@ public class PatientService {
         //Checking if patient exists
         if (!patientRepository.existsByEmail(email))
             throw new ResourceDoesNotExist("Patient with email " + email + " does not exist");
+        if(patientRepository.existsByEmail(newPatient.getEmail()))
+            throw new ResourceAlreadyExist("patient with email " + newPatient.getEmail() + " already exists");
+
         Patient oldPatient = patientRepository.findByEmail(email);
 
         //Updating patient's name
@@ -101,15 +105,8 @@ public class PatientService {
         if (newPatient.getDateOfBirth() != null) oldPatient.setDateOfBirth(newPatient.getDateOfBirth());
         oldPatient = patientRepository.save(oldPatient);
 
-        //Building GRPC Request for billing account
-        BillingRequest billingRequest = BillingRequest.newBuilder()
-                .setEmail(oldPatient.getEmail())
-                .setPatientId(oldPatient.getId().toString())
-                .setStatus("ACTIVE")
-                .build();
-
         //Calling GRPC Client method to add patient to billing service
-        BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(billingRequest);
+        BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(oldPatient, "ACTIVE");
         log.info(billingResponse.getPatientId() + " " + billingResponse.getEmail());
 
         //Building patient response dto and returning the same
@@ -134,15 +131,8 @@ public class PatientService {
         //deleting the patient
         patientRepository.deleteByEmail(email);
 
-        //Building GRPC Request for billing account
-        BillingRequest billingRequest = BillingRequest.newBuilder()
-                .setEmail(oldPatient.getEmail())
-                .setPatientId(oldPatient.getId().toString())
-                .setStatus("INACTIVE")
-                .build();
-
         //Calling GRPC Client method to add patient to billing service
-        BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(billingRequest);
+        BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(oldPatient, "INACTIVE");
         log.info(billingResponse.getPatientId() + " " + billingResponse.getEmail());
     }
 }
