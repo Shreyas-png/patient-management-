@@ -64,7 +64,7 @@ public class PatientService {
 
         //Calling GRPC Client method to add patient to billing service
         BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(savedPatient, "ACTIVE");
-        log.info(billingResponse.getPatientId() + " " + billingResponse.getEmail());
+        log.info("{} {}", billingResponse.getPatientId(), billingResponse.getEmail());
 
         //calling kafka method to push a patient event
         kafkaProducer.pushPatientEvent(savedPatient);
@@ -107,7 +107,7 @@ public class PatientService {
 
         //Calling GRPC Client method to add patient to billing service
         BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(oldPatient, "ACTIVE");
-        log.info(billingResponse.getPatientId() + " " + billingResponse.getEmail());
+        log.info("{} {}", billingResponse.getPatientId(), billingResponse.getEmail());
 
         //Building patient response dto and returning the same
         return PatientResponseDTO.builder()
@@ -133,6 +133,6 @@ public class PatientService {
 
         //Calling GRPC Client method to add patient to billing service
         BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(oldPatient, "INACTIVE");
-        log.info(billingResponse.getPatientId() + " " + billingResponse.getEmail());
+        log.info("{} {}", billingResponse.getPatientId(), billingResponse.getEmail());
     }
 }
