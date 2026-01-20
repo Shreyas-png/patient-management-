@@ -67,7 +67,7 @@ public class PatientService {
         log.info("{} {}", billingResponse.getPatientId(), billingResponse.getEmail());
 
         //calling kafka method to push a patient event
-        kafkaProducer.pushPatientEvent(savedPatient);
+        kafkaProducer.pushPatientEvent(savedPatient, "PATIENT_CREATED");
 
         //Building patient response DTO and returning the same
         return  PatientResponseDTO.builder()
@@ -84,6 +84,8 @@ public class PatientService {
         //Checking if patient exists
         if (!patientRepository.existsByEmail(email))
             throw new ResourceDoesNotExist("Patient with email " + email + " does not exist");
+
+        //Checking if there is conflict for new email
         if(patientRepository.existsByEmail(newPatient.getEmail()))
             throw new ResourceAlreadyExist("patient with email " + newPatient.getEmail() + " already exists");
 
@@ -108,6 +110,9 @@ public class PatientService {
         //Calling GRPC Client method to add patient to billing service
         BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(oldPatient, "ACTIVE");
         log.info("{} {}", billingResponse.getPatientId(), billingResponse.getEmail());
+
+        //pushing the event to kafka
+        kafkaProducer.pushPatientEvent(oldPatient, "Patient_Updated");
 
         //Building patient response dto and returning the same
         return PatientResponseDTO.builder()
@@ -134,5 +139,8 @@ public class PatientService {
         //Calling GRPC Client method to add patient to billing service
         BillingResponse billingResponse = billingServiceGrpcClient.addPatientToBillingService(oldPatient, "INACTIVE");
         log.info("{} {}", billingResponse.getPatientId(), billingResponse.getEmail());
+
+        //Pushing an event to kafka
+        kafkaProducer.pushPatientEvent(oldPatient, "Patient_Deleted");
     }
 }

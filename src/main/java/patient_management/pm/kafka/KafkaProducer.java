@@ -17,14 +17,14 @@ public class KafkaProducer {
          this.kafkaTemplate = kafkaTemplate;
      }
 
-     public void pushPatientEvent(Patient patient){
+     public void pushPatientEvent(Patient patient, String event){
 
          //Building patient event object to push message to kafka
          PatientEvent patientEvent = PatientEvent.newBuilder()
                  .setPatientID(patient.getId().toString())
                  .setName(patient.getName())
                  .setEmail(patient.getEmail())
-                 .setEventType("PATIENT_CREATED")
+                 .setEventType(event)
                  .build();
 
          kafkaTemplate.send("patient",patient.getId().toString(), patientEvent.toByteArray())
