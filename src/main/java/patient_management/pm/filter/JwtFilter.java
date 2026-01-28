@@ -8,6 +8,7 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.checkerframework.checker.nullness.qual.NonNull;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
@@ -65,13 +66,14 @@ public class JwtFilter extends OncePerRequestFilter {
 
             //setting security context so that we can use this in our controller
             SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            filterChain.doFilter(request, response);
         }catch(JwtException ex){
             log.info("JWT validation exception occurred {}", ex.getMessage());
+            throw new BadCredentialsException("Invalid JWT");
         }catch(IllegalArgumentException ex){
             log.info("Invalid JWT token {}", ex.getMessage());
+            throw new BadCredentialsException("Invalid JWT");
         }
-
-        filterChain.doFilter(request, response);
-
     }
 }
